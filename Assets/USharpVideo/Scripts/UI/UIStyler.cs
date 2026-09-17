@@ -1,4 +1,4 @@
-﻿
+
 using TMPro;
 using UnityEngine;
 using System.Reflection;
@@ -125,7 +125,7 @@ namespace UdonSharp.Video.UI
                 }
             }
 
-            foreach (VideoControlHandler controlHandler in this.GetUdonSharpComponentsInChildren<VideoControlHandler>(true))
+            foreach (VideoControlHandler controlHandler in this.GetComponentsInChildren<VideoControlHandler>(true))
             {
                 Undo.RecordObject(controlHandler, "Apply UI Style");
 
@@ -135,7 +135,7 @@ namespace UdonSharp.Video.UI
                 controlHandler.buttonActivatedColor = GetColor(lookup[UIStyleMarkup.StyleClass.HighlightedButton]);
                 controlHandler.iconInvertedColor = GetColor(lookup[UIStyleMarkup.StyleClass.InvertedIcon]);
 
-                controlHandler.ApplyProxyModifications();
+
 
                 if (PrefabUtility.IsPartOfPrefabInstance(controlHandler.gameObject))
                     PrefabUtility.RecordPrefabInstancePropertyModifications(UdonSharpEditorUtility.GetBackingUdonBehaviour(controlHandler));

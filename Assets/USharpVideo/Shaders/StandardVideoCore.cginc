@@ -789,16 +789,10 @@ inline UnityGI FragmentGI (
 
 #include "UnityStandardConfig.cginc"
 
-#if UNITY_STANDARD_SIMPLE
-VertexOutputBaseSimple vertBase(VertexInput v) { return vertForwardBaseSimple(v); }
-VertexOutputForwardAddSimple vertAdd(VertexInput v) { return vertForwardAddSimple(v); }
-half4 fragBase(VertexOutputBaseSimple i) : SV_Target{ return fragForwardBaseSimpleInternal(i); }
-half4 fragAdd(VertexOutputForwardAddSimple i) : SV_Target{ return fragForwardAddSimpleInternal(i); }
-#else
+// Use full forward definitions for all platforms
 VertexOutputForwardBase vertBase(VertexInput v) { return vertForwardBase(v); }
 VertexOutputForwardAdd vertAdd(VertexInput v) { return vertForwardAdd(v); }
-half4 fragBase(VertexOutputForwardBase i) : SV_Target{ return fragForwardBaseInternal(i); }
-half4 fragAdd(VertexOutputForwardAdd i) : SV_Target{ return fragForwardAddInternal(i); }
-#endif
+half4 fragBase(VertexOutputForwardBase i) : SV_Target { return fragForwardBaseInternal(i); }
+half4 fragAdd(VertexOutputForwardAdd i) : SV_Target { return fragForwardAddInternal(i); }
 
 #endif // UNITY_STANDARD_CORE_FORWARD_INCLUDED

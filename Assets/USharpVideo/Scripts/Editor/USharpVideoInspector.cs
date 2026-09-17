@@ -1,4 +1,4 @@
-﻿
+
 using UnityEditor;
 using UdonSharpEditor;
 using UnityEditorInternal;
@@ -60,8 +60,7 @@ namespace UdonSharp.Video.Internal
 
         public override void OnInspectorGUI()
         {
-            if (UdonSharpGUI.DrawConvertToUdonBehaviourButton(target) ||
-                UdonSharpGUI.DrawProgramSource(target))
+            if (UdonSharpGUI.DrawProgramSource(target))
                 return;
 
             UdonSharpGUI.DrawUILine();
@@ -88,7 +87,7 @@ namespace UdonSharp.Video.Internal
 
             if (EditorGUI.EndChangeCheck())
             {
-                VideoPlayerManager manager = ((Component)target).GetUdonSharpComponentInChildren<VideoPlayerManager>(true);
+                VideoPlayerManager manager = ((Component)target).GetComponentInChildren<VideoPlayerManager>(true);
 
                 foreach (AudioSource source in manager.audioSources)
                 {
@@ -103,7 +102,7 @@ namespace UdonSharp.Video.Internal
                     }
                 }
 
-                VolumeController[] volumeControllers = ((Component)target).GetUdonSharpComponentsInChildren<VolumeController>(true);
+                VolumeController[] volumeControllers = ((Component)target).GetComponentsInChildren<VolumeController>(true);
 
                 foreach (VolumeController controller in volumeControllers)
                 {

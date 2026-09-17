@@ -1,4 +1,4 @@
-﻿
+
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
@@ -101,7 +101,7 @@ namespace UdonSharp.Video
 
                 targetOutput.outputTexture = newCRT;
 
-                targetOutput.ApplyProxyModifications();
+
             }
         }
 

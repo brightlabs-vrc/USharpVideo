@@ -1,4 +1,4 @@
-﻿
+
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
@@ -196,7 +196,7 @@ namespace UdonSharp.Video
 
         public override void OnInspectorGUI()
         {
-            if (UdonSharpGUI.DrawConvertToUdonBehaviourButton(target)) return;
+
             if (UdonSharpGUI.DrawProgramSource(target, false)) return;
 
             EditorGUILayout.HelpBox("Do not modify the video players on this game object, all modifications must be done on the USharpVideoPlayer. If you change the settings on these, you will break things.", MessageType.Warning);
