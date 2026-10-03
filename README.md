@@ -1,3 +1,7 @@
+# Notice
+
+This fork exists as a way to have a working video player that we can rely on our worlds, so maintenance on this will be regular, but most of it is happening internally. If you have an idea to modernize/improve this code, please send patches!
+
 # USharpVideo
 A basic video player made for VRChat using Udon and UdonSharp. Supports normal videos and live streams.
 
