@@ -12,6 +12,10 @@ using UnityEditor;
 using UdonSharpEditor;
 #endif
 
+#if VRC_ENABLE_PLAYER_PERSISTENCE
+using VRC.SDK3.Persistence;
+#endif
+
 #pragma warning disable CS0612 // Type or member is obsolete
 
 namespace UdonSharp.Video
@@ -136,6 +140,42 @@ namespace UdonSharp.Video
             }
         }
 
+        public void SetAudioRange(float range)
+        {
+            if (audioSources == null) return;
+            foreach (AudioSource audioSource in audioSources)
+            {
+                if (audioSource)
+                    audioSource.maxDistance = range;
+            }
+        }
+
+        private bool _hasRestored;
+
+        public override void OnPlayerRestored(VRCPlayerApi player)
+        {
+            if (player != null && player.isLocal)
+            {
+                _hasRestored = true;
+#if VRC_ENABLE_PLAYER_PERSISTENCE
+                if (PlayerData.HasKey(player, "USV_Volume"))
+                {
+                    float savedVol = PlayerData.GetFloat(player, "USV_Volume");
+                    SetVolume(savedVol);
+                    if (receiver)
+                        receiver.SetVolume(savedVol);
+                }
+                if (PlayerData.HasKey(player, "USV_Muted"))
+                {
+                    bool savedMuted = PlayerData.GetBool(player, "USV_Muted");
+                    SetMuted(savedMuted);
+                    if (receiver)
+                        receiver.SetMuted(savedMuted);
+                }
+#endif
+            }
+        }
+
         private float _currentVolume = 1f;
         private bool _currentlyMuted;
 
@@ -155,6 +195,13 @@ namespace UdonSharp.Video
             }
 
             _currentVolume = volume;
+
+#if VRC_ENABLE_PLAYER_PERSISTENCE
+            if (_hasRestored && Networking.LocalPlayer != null && Networking.LocalPlayer.IsValid())
+            {
+                PlayerData.SetFloat("USV_Volume", volume);
+            }
+#endif
         }
 
         public void SetMuted(bool muted)
@@ -170,6 +217,13 @@ namespace UdonSharp.Video
             {
                 SetVolume(_currentVolume);
             }
+
+#if VRC_ENABLE_PLAYER_PERSISTENCE
+            if (_hasRestored && Networking.LocalPlayer != null && Networking.LocalPlayer.IsValid())
+            {
+                PlayerData.SetBool("USV_Muted", muted);
+            }
+#endif
         }
     }
 

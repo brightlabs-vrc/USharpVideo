@@ -1,4 +1,4 @@
-﻿
+
 using JetBrains.Annotations;
 using UdonSharp;
 using UnityEngine;
@@ -124,25 +124,25 @@ namespace UdonSharp.Video
 
         void UpdateMaster()
         {
-#if !UNITY_EDITOR
-            // We know the owner of this will always be the master so just get the owner and update the name
             if (masterField)
             {
                 VRCPlayerApi owner = Networking.GetOwner(gameObject);
                 if (owner != null && owner.IsValid())
-                    masterField.text = Networking.GetOwner(gameObject).displayName;
+                    masterField.text = owner.displayName;
             }
-#endif
         }
 
         private void UpdateVideoOwner()
         {
-#if !UNITY_EDITOR
-            if (ownerField)
-                ownerField.text = Networking.GetOwner(targetVideoPlayer.gameObject).displayName;
-#endif
+            if (ownerField && targetVideoPlayer)
+            {
+                VRCPlayerApi owner = Networking.GetOwner(targetVideoPlayer.gameObject);
+                if (owner != null && owner.IsValid())
+                    ownerField.text = owner.displayName;
+            }
 
-            SetLocked(targetVideoPlayer.IsLocked());
+            if (targetVideoPlayer)
+                SetLocked(targetVideoPlayer.IsLocked());
         }
 
         [PublicAPI]

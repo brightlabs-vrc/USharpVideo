@@ -1,5 +1,3 @@
-﻿
-#define USE_SERVER_TIME_MS // Uses GetServerTimeMilliseconds instead of the server datetime which in theory is less reliable
 
 using JetBrains.Annotations;
 using UdonSharp;
@@ -40,11 +38,9 @@ namespace UdonSharp.Video
         [SerializeField]
         private float defaultVolume = 0.5f;
 
-#pragma warning disable CS0414
         [Tooltip("The max range of the audio sources on this video player")]
         [SerializeField]
         private float audioRange = 40f;
-#pragma warning restore CS0414
 
         /// <summary>
         /// Local offset from the network time to sync the video
@@ -89,19 +85,9 @@ namespace UdonSharp.Video
         [UdonSynced]
         private int _nextPlaylistIndex;
 
-#if USE_SERVER_TIME_MS
         [UdonSynced]
         private int _networkTimeVideoStart;
         private int _localNetworkTimeStart;
-#else
-        [UdonSynced]
-        private double _videoStartNetworkTime;
-        private double _localVideoStartTime;
-
-        [UdonSynced]
-        private long _networkTimeStart;
-        private System.DateTime _localNetworkTimeStart;
-#endif
 
         [UdonSynced]
         private bool _ownerPlaying;
@@ -185,19 +171,15 @@ namespace UdonSharp.Video
 
             SetUILocked(_isMasterOnly);
 
-#if !USE_SERVER_TIME_MS
-            _networkTimeStart = Networking.GetNetworkDateTime().Ticks;
-            _localNetworkTimeStart = new System.DateTime(_networkTimeStart, System.DateTimeKind.Utc);
-#endif
-
             PlayNextVideoFromPlaylist();
 
+            _videoPlayerManager.SetAudioRange(audioRange);
             SetVolume(defaultVolume);
 
             // Serialize the default setup state from the master once regardless of if a video has played
             QueueSerialize();
             
-            LogMessage("USharpVideo v1.0.1 Initialized");
+            LogMessage("USharpVideo v1.0.1-202610_brightlabs.1 Initialized");
         }
 
         public override void OnVideoReady()
@@ -236,11 +218,7 @@ namespace UdonSharp.Video
                     }
                     else
                     {
-#if USE_SERVER_TIME_MS
                         if (_networkTimeVideoStart == 0)
-#else
-                        if (_videoStartNetworkTime == 0f || _videoStartNetworkTime > GetNetworkTime() - _videoPlayerManager.GetDuration()) // Todo: remove the 0f check and see how this actually gets set to 0 while the owner is playing
-#endif
                         {
                             _waitForSync = true;
                             SetStatusText("Waiting for owner sync...");
@@ -250,11 +228,7 @@ namespace UdonSharp.Video
                             _waitForSync = false;
                             SyncVideo();
                             SetStatusText("");
-#if USE_SERVER_TIME_MS
                             LogMessage($"Loaded into world with complete video, duration: {_videoPlayerManager.GetDuration()}, start net time: {_networkTimeVideoStart}");
-#else
-                            LogMessage($"Loaded into world with complete video, duration: {_videoPlayerManager.GetDuration()}, start net time: {_videoStartNetworkTime}, subtracted net time {GetNetworkTime() - _videoPlayerManager.GetDuration()}");
-#endif
                         }
                     }
                 }
@@ -272,11 +246,7 @@ namespace UdonSharp.Video
             {
                 SetPausedInternal(false, false);
 
-#if USE_SERVER_TIME_MS
                 _networkTimeVideoStart = Networking.GetServerTimeInMilliseconds() - (int)(_videoTargetStartTime * 1000f);
-#else
-                _videoStartNetworkTime = GetNetworkTime() - _videoTargetStartTime;
-#endif
     
                 if (IsInVideoMode())
                 {
@@ -408,11 +378,7 @@ namespace UdonSharp.Video
 
         public override void OnVideoLoop()
         {
-#if USE_SERVER_TIME_MS
             _localNetworkTimeStart = _networkTimeVideoStart = Networking.GetServerTimeInMilliseconds();
-#else
-            _localVideoStartTime = _videoStartNetworkTime = GetNetworkTime();
-#endif
 
             QueueSerialize();
         }
@@ -429,11 +395,7 @@ namespace UdonSharp.Video
                 if (IsInVideoMode())
                 {
                     // Keep the target time the same while paused
-#if USE_SERVER_TIME_MS
                     _networkTimeVideoStart = Networking.GetServerTimeInMilliseconds() - (int)(_videoPlayerManager.GetTime() * 1000f);
-#else
-                    _videoStartNetworkTime = GetNetworkTime() - _videoPlayerManager.GetTime();
-#endif
                 }
             }
             else
@@ -454,13 +416,10 @@ namespace UdonSharp.Video
             UpdateRenderTexture(); // Needed because AVPro can swap textures whenever
         }
 
-        /// <summary>
-        /// Uncomment this to prevent people from taking ownership of the video player when they shouldn't be able to
-        /// </summary>
-        //public override bool OnOwnershipRequest(VRCPlayerApi requestingPlayer, VRCPlayerApi requestedOwner)
-        //{
-        //    return !_isMasterOnly || IsPrivlegedUser(requestedOwner);
-        //}
+        public override bool OnOwnershipRequest(VRCPlayerApi requestingPlayer, VRCPlayerApi requestedOwner)
+        {
+            return !_isMasterOnly || IsPrivilegedUser(requestedOwner);
+        }
         
         private bool _lastMasterLocked;
 
@@ -468,10 +427,6 @@ namespace UdonSharp.Video
         {
             if (Networking.IsOwner(gameObject))
                 return;
-
-#if !USE_SERVER_TIME_MS
-            _localNetworkTimeStart = new System.DateTime(_networkTimeStart, System.DateTimeKind.Utc);
-#endif
 
             SetPausedInternal(_ownerPaused, false);
             SetLoopingInternal(_loopVideo);
@@ -492,23 +447,13 @@ namespace UdonSharp.Video
                 _videoPlayerManager.Stop();
                 StartVideoLoad(_syncedURL);
 
-#if USE_SERVER_TIME_MS
                 _localNetworkTimeStart = _networkTimeVideoStart;
-#else
-                _localVideoStartTime = _videoStartNetworkTime;
-#endif
 
                 LogMessage("Playing synced " + _syncedURL);
             }
-#if USE_SERVER_TIME_MS
             else if (_networkTimeVideoStart != _localNetworkTimeStart) // Detect seeks
             {
                 _localNetworkTimeStart = _networkTimeVideoStart;
-#else
-            else if (_videoStartNetworkTime != _localVideoStartTime) // Detect seeks
-            {
-                _localVideoStartTime = _videoStartNetworkTime;
-#endif
                 SyncVideo();
             }
 
@@ -517,11 +462,7 @@ namespace UdonSharp.Video
                 float duration = GetVideoManager().GetDuration();
 
                 // If the owner did a seek on the video after it finished, we need to start playing it again
-#if USE_SERVER_TIME_MS
                 if ((Networking.GetServerTimeInMilliseconds() - _networkTimeVideoStart) / 1000f < duration - 3f)
-#else
-                if (GetNetworkTime() - _videoStartNetworkTime < duration - 3f)
-#endif
                     _videoPlayerManager.Play();
             }
 
@@ -542,6 +483,14 @@ namespace UdonSharp.Video
                 QueueSerialize();
         }
 
+        public override void OnPostSerialization(VRC.Udon.Common.SerializationResult result)
+        {
+            if (!result.success)
+            {
+                QueueRateLimitedSerialize();
+            }
+        }
+
         /// <summary>
         /// Stops playback of the video completely and clears data
         /// </summary>
@@ -551,11 +500,7 @@ namespace UdonSharp.Video
             if (!Networking.IsOwner(gameObject))
                 return;
 
-#if USE_SERVER_TIME_MS
             _networkTimeVideoStart = 0;
-#else
-            _videoStartNetworkTime = 0f;
-#endif
             _ownerPlaying = false;
             _locallyPaused = _ownerPaused = false;
             _videoTargetStartTime = 0f;
@@ -617,9 +562,7 @@ namespace UdonSharp.Video
             
             StartVideoLoad(url);
             _ownerPlaying = false;
-#if USE_SERVER_TIME_MS
             _networkTimeVideoStart = 0;
-#endif
 
             _videoTargetStartTime = GetVideoStartTime(urlStr);
 
@@ -681,11 +624,7 @@ namespace UdonSharp.Video
         {
             if (IsInVideoMode())
             {
-#if USE_SERVER_TIME_MS
                 float offsetTime = Mathf.Clamp((Networking.GetServerTimeInMilliseconds() - _networkTimeVideoStart) / 1000f + localSyncOffset, 0f, _videoPlayerManager.GetDuration());
-#else
-                float offsetTime = Mathf.Clamp((float)(GetNetworkTime() - _videoStartNetworkTime) + localSyncOffset, 0f, _videoPlayerManager.GetDuration());
-#endif
 
                 if (Mathf.Abs(_videoPlayerManager.GetTime() - offsetTime) > syncThreshold)
                 {
@@ -703,11 +642,7 @@ namespace UdonSharp.Video
         {
             if (IsInVideoMode())
             {
-#if USE_SERVER_TIME_MS
                 float offsetTime = Mathf.Clamp((Networking.GetServerTimeInMilliseconds() - _networkTimeVideoStart) / 1000f + localSyncOffset, 0f, _videoPlayerManager.GetDuration());
-#else
-                float offsetTime = Mathf.Clamp((float)(GetNetworkTime() - _videoStartNetworkTime) + localSyncOffset, 0f, _videoPlayerManager.GetDuration());
-#endif
 
                 float syncNudgeTime = Mathf.Max(0f, offsetTime - 1f);
                 _videoPlayerManager.SetTime(syncNudgeTime); // Seek to slightly earlier before syncing to the real time to get the video player to jump cleanly
@@ -718,11 +653,9 @@ namespace UdonSharp.Video
 
         private void StartVideoLoad(VRCUrl url)
         {
-#if UNITY_EDITOR
-            LogMessage($"Started video load for URL: {url}");
-#else
-            LogMessage($"Started video load for URL: {url}, requested by {Networking.GetOwner(gameObject).displayName}");
-#endif
+            VRCPlayerApi owner = Networking.GetOwner(gameObject);
+            string ownerName = (owner != null && owner.IsValid()) ? owner.displayName : "Local Player";
+            LogMessage($"Started video load for URL: {url}, requested by {ownerName}");
 
             SetStatusText("Loading video...");
             ResetVideoLoad();
@@ -869,12 +802,7 @@ namespace UdonSharp.Video
             _lastVideoTime = newTargetTime;
             _lastCurrentTime = newTargetTime;
 
-#if USE_SERVER_TIME_MS
             _localNetworkTimeStart = _networkTimeVideoStart = Networking.GetServerTimeInMilliseconds() - (int)(newTargetTime * 1000f);
-#else
-            _videoStartNetworkTime = GetNetworkTime() - newTargetTime;
-            _localVideoStartTime = _videoStartNetworkTime;
-#endif
 
             if (!_locallyPaused && !GetVideoManager().IsPlaying())
                 GetVideoManager().Play();
@@ -933,10 +861,8 @@ namespace UdonSharp.Video
         [PublicAPI]
         public bool IsPrivilegedUser(VRCPlayerApi player)
         {
-#if UNITY_EDITOR
-            if (player == null)
-                return true;
-#endif
+            if (player == null || !player.IsValid())
+                return false;
 
             return player.isMaster || (allowInstanceCreatorControl && player.isInstanceOwner);
         }
@@ -1184,13 +1110,13 @@ namespace UdonSharp.Video
 #region Utilities
         /// <summary>
         /// Parses the start time of a YouTube video from the URL.
+        /// Supports integer seconds (e.g. t=90) as well as h/m/s formats (e.g. t=1m30s, t=1h2m3s).
         /// If no time is found or given URL is not a YouTube URL, returns 0.0
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
         private float GetVideoStartTime(string url)
         {
-            // Attempt to parse out a start time from YouTube links with t= or start=
             if (url.Contains("youtube.com/watch") ||
                 url.Contains("youtu.be/"))
             {
@@ -1205,25 +1131,47 @@ namespace UdonSharp.Video
                 char[] urlArr = url.ToCharArray();
                 int numIdx = url.IndexOf('=', tIndex) + 1;
 
-                string intStr = "";
+                int currentSegment = 0;
+                int totalSeconds = 0;
+                bool hasHMS = false;
 
                 while (numIdx < urlArr.Length)
                 {
-                    char currentChar = urlArr[numIdx];
-                    if (!char.IsNumber(currentChar))
+                    char c = urlArr[numIdx];
+                    if (c >= '0' && c <= '9')
+                    {
+                        currentSegment = currentSegment * 10 + (c - '0');
+                    }
+                    else if (c == 'h' || c == 'H')
+                    {
+                        totalSeconds += currentSegment * 3600;
+                        currentSegment = 0;
+                        hasHMS = true;
+                    }
+                    else if (c == 'm' || c == 'M')
+                    {
+                        totalSeconds += currentSegment * 60;
+                        currentSegment = 0;
+                        hasHMS = true;
+                    }
+                    else if (c == 's' || c == 'S')
+                    {
+                        totalSeconds += currentSegment;
+                        currentSegment = 0;
+                        hasHMS = true;
+                    }
+                    else
+                    {
                         break;
-
-                    intStr += currentChar;
+                    }
 
                     ++numIdx;
                 }
 
-                if (string.IsNullOrWhiteSpace(intStr))
-                    return 0f;
+                if (hasHMS)
+                    return totalSeconds + currentSegment;
 
-                int secondsCount = 0;
-                if (int.TryParse(intStr, out secondsCount))
-                    return secondsCount;
+                return currentSegment;
             }
 
             return 0f;
@@ -1278,18 +1226,6 @@ namespace UdonSharp.Video
                 SetStatusText("");
             }
         }
-
-#if !USE_SERVER_TIME_MS
-        /// <summary>
-        /// Gets network time with some degree of ms resolution unlike GetServerTimeInSeconds which is 1 second resolution
-        /// </summary>
-        /// <returns></returns>
-        double GetNetworkTime()
-        {
-            //return Networking.GetServerTimeInSeconds();
-            return (Networking.GetNetworkDateTime() - _localNetworkTimeStart).TotalSeconds;
-        }
-#endif
 
         private void LogMessage(string message)
         {
@@ -1477,22 +1413,35 @@ namespace UdonSharp.Video
         }
 
         private Texture _lastAssignedRenderTexture;
+        private int _propUdonVideoTex;
+        private int _propUdonVideoData;
 
         private void UpdateRenderTexture()
         {
-            if (_registeredScreenHandlers == null)
-                return;
-
             Texture renderTexture = _videoPlayerManager.GetVideoTexture();
 
             if (_lastAssignedRenderTexture == renderTexture)
                 return;
 
-            foreach (VideoScreenHandler handler in _registeredScreenHandlers)
+            if (_propUdonVideoTex == 0)
             {
-                if (handler)
+                _propUdonVideoTex = VRCShader.PropertyToID("_Udon_VideoTex");
+                _propUdonVideoData = VRCShader.PropertyToID("_Udon_VideoData");
+            }
+
+            VRCShader.SetGlobalTexture(_propUdonVideoTex, renderTexture);
+            bool isAVPro = IsUsingAVProPlayer();
+            float aspect = (renderTexture != null && renderTexture.height > 0) ? (float)renderTexture.width / renderTexture.height : 1.777778f;
+            VRCShader.SetGlobalVector(_propUdonVideoData, new Vector4(aspect, isAVPro ? 1f : 0f, 0f, 0f));
+
+            if (_registeredScreenHandlers != null)
+            {
+                foreach (VideoScreenHandler handler in _registeredScreenHandlers)
                 {
-                    handler.UpdateVideoTexture(renderTexture, IsUsingAVProPlayer());
+                    if (handler)
+                    {
+                        handler.UpdateVideoTexture(renderTexture, isAVPro);
+                    }
                 }
             }
 

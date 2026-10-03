@@ -1,4 +1,4 @@
-﻿
+
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
@@ -10,7 +10,11 @@ namespace UdonSharp.Video
     [AddComponentMenu("Udon Sharp/Video/Utilities/Renderer GI Update")]
     public class RendererGIUpdate : UdonSharpBehaviour
     {
+        [Tooltip("Interval in seconds between GI updates. Defaults to 0.1s (~10 Hz) to avoid main-thread stalling.")]
+        [SerializeField] private float updateInterval = 0.1f;
+
         private Renderer targetRenderer;
+        private float _lastUpdateTime;
 
         void Start()
         {
@@ -19,7 +23,13 @@ namespace UdonSharp.Video
 
         private void Update()
         {
-            RendererExtensions.UpdateGIMaterials(targetRenderer);
+            float time = Time.time;
+            if (time - _lastUpdateTime >= updateInterval)
+            {
+                _lastUpdateTime = time;
+                if (targetRenderer)
+                    RendererExtensions.UpdateGIMaterials(targetRenderer);
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -28,6 +28,13 @@ namespace UdonSharp.Video.Internal
             string[] splitPath = Application.persistentDataPath.Split('/', '\\');
             _youtubeDLPath = string.Join("\\", splitPath.Take(splitPath.Length - 2)) + "\\VRChat\\VRChat\\Tools\\yt-dlp.exe";
             
+            if (!File.Exists(_youtubeDLPath))
+            {
+                string localLow = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "LocalLow", "VRChat", "VRChat", "Tools", "yt-dlp.exe");
+                if (File.Exists(localLow))
+                    _youtubeDLPath = localLow;
+            }
+
             if (!File.Exists(_youtubeDLPath))
             {
                 _youtubeDLPath = string.Join("\\", splitPath.Take(splitPath.Length - 2)) + "\\VRChat\\VRChat\\Tools\\youtube-dl.exe";
